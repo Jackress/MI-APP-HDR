@@ -1,9 +1,7 @@
-
 import streamlit as st
 import sys
 import os
 
-# Sistema de emergencia para forzar la lectura de OpenCV en servidores en la nube
 try:
     import cv2
 except ModuleNotFoundError:
@@ -29,17 +27,33 @@ if archivos_subidos and len(archivos_subidos) >= 2:
     st.info(f"Procesando {len(archivos_subidos)} imágenes...")
     
     lista_imagenes = []
+    
+    # Definimos un tamaño máximo para no colapsar la memoria RAM del servidor
+    TAMANO_MAXIMO = 1920 
+    
     for archivo in archivos_subidos:
         file_bytes = np.asarray(bytearray(archivo.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        
+        # Optimizador: Redimensionar si la imagen original es extremadamente gigante
+        alto, ancho = img.shape[:2]
+        if max(alto, ancho) > TAMANO_MAXIMO:
+            if ancho > alto:
+                nuevo_ancho = TAMANO_MAXIMO
+                nuevo_alto = int(alto * (TAMANO_MAXIMO / ancho))
+            else:
+                nuevo_alto = TAMANO_MAXIMO
+                nuevo_ancho = int(ancho * (TAMANO_MAXIMO / alto))
+            img = cv2.resize(img, (nuevo_ancho, nuevo_alto), interpolation=cv2.INTER_AREA)
+            
         lista_imagenes.append(img)
     
     try:
-        st.write("🔄 Alineando imágenes...")
+        st.write("🔄 Alineando imágenes con el sensor...")
         alignMTB = cv2.createAlignMTB()
         alignMTB.process(lista_imagenes, lista_imagenes)
         
-        st.write("🎨 Fusionando exposiciones...")
+        st.write("🎨 Fusionando exposiciones (Algoritmo Mertens)...")
         merge_mertens = cv2.createMergeMertens()
         hdr_mertens = merge_mertens.process(lista_imagenes)
         
